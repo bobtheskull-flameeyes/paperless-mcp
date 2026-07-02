@@ -173,10 +173,15 @@ func (r *ToolRegistry) listDocuments(args map[string]interface{}) *ToolCallResul
 
 	filters := map[string]string{}
 	filterKeys := []string{
-		"tags__id__in", "correspondent__id", "document_type__id",
-		"storage_path__id", "is_tagged", "created__date__gt",
-		"created__date__lt", "added__date__gt", "added__date__lt",
+		"tags__id__in", "tags__id__all", "tags__id__none",
+		"correspondent__id", "document_type__id",
+		"storage_path__id", "is_tagged",
+		"created__date__gt", "created__date__lt",
+		"created__date__gte", "created__date__lte",
+		"added__date__gt", "added__date__lt",
+		"added__date__gte", "added__date__lte",
 		"title__icontains", "content__icontains",
+		"mime_type",
 	}
 	for _, key := range filterKeys {
 		if v, ok := getStringArg(args, key); ok {
@@ -188,6 +193,15 @@ func (r *ToolRegistry) listDocuments(args map[string]interface{}) *ToolCallResul
 				filters[key] = strconv.Itoa(n)
 			}
 		}
+	}
+
+	// full_perms and fields are Paperless query parameters rather than
+	// Django-style filters, so we inject them directly.
+	if v, ok := getBoolArg(args, "full_perms"); ok && v {
+		filters["full_perms"] = "true"
+	}
+	if v, ok := getStringArg(args, "fields"); ok {
+		filters["fields"] = v
 	}
 
 	data, err := r.client.ListDocuments(page, pageSize, ordering, filters)
@@ -529,22 +543,31 @@ func (r *ToolRegistry) defineTools() []Tool {
 		},
 		{
 			Name:        "list_documents",
-			Description: "List documents with optional filtering and sorting.",
+			Description: "List documents with optional filtering and sorting. The response includes 'count' (total matches), 'next'/'previous' (pagination URLs — use 'page' parameter instead of following these directly), and an 'all' field containing every matching document ID in one shot (useful for getting the full ID set without paginating). Note: pagination URLs returned by Paperless may use http:// even when the server is behind https — always use the 'page' parameter to paginate.",
 			InputSchema: jsonSchema(map[string]propDef{
-				"page":               {Type: "integer", Desc: "Page number."},
-				"page_size":          {Type: "integer", Desc: "Results per page."},
-				"ordering":           {Type: "string", Desc: "Sort field, e.g. '-created', 'title', '-added'."},
-				"tags__id__in":       {Type: "string", Desc: "Comma-separated tag IDs to filter by."},
-				"correspondent__id":  {Type: "integer", Desc: "Filter by correspondent ID."},
-				"document_type__id":  {Type: "integer", Desc: "Filter by document type ID."},
-				"storage_path__id":   {Type: "integer", Desc: "Filter by storage path ID."},
-				"is_tagged":          {Type: "string", Desc: "Filter: 'true' for tagged, 'false' for untagged."},
-				"created__date__gt":  {Type: "string", Desc: "Filter: created after date (YYYY-MM-DD)."},
-				"created__date__lt":  {Type: "string", Desc: "Filter: created before date (YYYY-MM-DD)."},
-				"added__date__gt":    {Type: "string", Desc: "Filter: added after date (YYYY-MM-DD)."},
-				"added__date__lt":    {Type: "string", Desc: "Filter: added before date (YYYY-MM-DD)."},
-				"title__icontains":   {Type: "string", Desc: "Filter: title contains (case-insensitive)."},
-				"content__icontains": {Type: "string", Desc: "Filter: content contains (case-insensitive)."},
+				"page":                {Type: "integer", Desc: "Page number."},
+				"page_size":           {Type: "integer", Desc: "Results per page."},
+				"ordering":            {Type: "string", Desc: "Sort field, e.g. '-created', 'title', '-added'."},
+				"tags__id__in":        {Type: "string", Desc: "Comma-separated tag IDs — matches documents with ANY of these tags (OR)."},
+				"tags__id__all":       {Type: "string", Desc: "Comma-separated tag IDs — matches documents with ALL of these tags (AND)."},
+				"tags__id__none":      {Type: "string", Desc: "Comma-separated tag IDs — excludes documents with any of these tags."},
+				"correspondent__id":   {Type: "integer", Desc: "Filter by correspondent ID."},
+				"document_type__id":   {Type: "integer", Desc: "Filter by document type ID."},
+				"storage_path__id":    {Type: "integer", Desc: "Filter by storage path ID."},
+				"is_tagged":           {Type: "string", Desc: "Filter: 'true' for tagged, 'false' for untagged."},
+				"created__date__gt":   {Type: "string", Desc: "Filter: created after date, exclusive (YYYY-MM-DD)."},
+				"created__date__lt":   {Type: "string", Desc: "Filter: created before date, exclusive (YYYY-MM-DD)."},
+				"created__date__gte":  {Type: "string", Desc: "Filter: created on or after date, inclusive (YYYY-MM-DD)."},
+				"created__date__lte":  {Type: "string", Desc: "Filter: created on or before date, inclusive (YYYY-MM-DD)."},
+				"added__date__gt":     {Type: "string", Desc: "Filter: added after date, exclusive (YYYY-MM-DD)."},
+				"added__date__lt":     {Type: "string", Desc: "Filter: added before date, exclusive (YYYY-MM-DD)."},
+				"added__date__gte":    {Type: "string", Desc: "Filter: added on or after date, inclusive (YYYY-MM-DD)."},
+				"added__date__lte":    {Type: "string", Desc: "Filter: added on or before date, inclusive (YYYY-MM-DD)."},
+				"title__icontains":    {Type: "string", Desc: "Filter: title contains (case-insensitive)."},
+				"content__icontains":  {Type: "string", Desc: "Filter: content contains (case-insensitive)."},
+				"mime_type":           {Type: "string", Desc: "Filter by MIME type (e.g. 'application/pdf')."},
+				"full_perms":          {Type: "boolean", Desc: "Include full permission objects in results (default false)."},
+				"fields":              {Type: "string", Desc: "Comma-separated list of fields to return (e.g. 'id,title' for lightweight queries)."},
 			}, nil),
 		},
 		{
@@ -564,7 +587,7 @@ func (r *ToolRegistry) defineTools() []Tool {
 		},
 		{
 			Name:        "upload_document",
-			Description: "Upload a new document to Paperless-ngx.",
+			Description: "Upload a new document to Paperless-ngx. Note: to set permissions on creation, use the key 'set_permissions' (not 'permissions').",
 			InputSchema: jsonSchema(map[string]propDef{
 				"file":                   {Type: "string", Desc: "Base64-encoded file content."},
 				"filename":               {Type: "string", Desc: "Filename including extension (e.g. 'invoice.pdf')."},
@@ -578,7 +601,7 @@ func (r *ToolRegistry) defineTools() []Tool {
 		},
 		{
 			Name:        "update_document",
-			Description: "Update metadata of an existing document.",
+			Description: "Update metadata of an existing document. Note: to set permissions, use the key 'set_permissions' (not 'permissions'). GET returns 'permissions' but PATCH expects 'set_permissions'.",
 			InputSchema: jsonSchema(map[string]propDef{
 				"id":                    {Type: "integer", Desc: "Document ID."},
 				"title":                 {Type: "string", Desc: "New title."},

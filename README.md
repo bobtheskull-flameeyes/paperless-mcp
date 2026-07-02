@@ -99,6 +99,27 @@ development only).
 The server authenticates to Paperless-ngx using
 `Authorization: Token <paperless_token>` on all API requests.
 
+## API Compatibility
+
+The server targets **Paperless-ngx REST API version 5**. At startup it probes
+the `/api/` endpoint and logs a warning if the instance reports a newer version,
+so you notice when an upgrade might have introduced breaking changes. The server
+does not refuse to start — the warning is advisory only.
+
+### Known Paperless-ngx API quirks
+
+- **Pagination URLs use HTTP even when Paperless is behind HTTPS.** The `next`
+  and `previous` fields in list responses may have an `http://` scheme when the
+  actual endpoint requires `https://`. Always use the `page` parameter to
+  paginate rather than following `next`/`previous` URLs directly.
+- **`permissions` vs `set_permissions`.** GET responses include a `permissions`
+  field, but POST/PATCH requests must use `set_permissions` instead. The tool
+  descriptions note this, but callers should be aware.
+- **The `all` field in list responses.** List endpoints return an `all` array
+  containing every matching document ID. This lets you get the full ID set
+  without paginating, which avoids skew when documents are being modified
+  concurrently.
+
 ## API Endpoints
 
 ### `POST /mcp`

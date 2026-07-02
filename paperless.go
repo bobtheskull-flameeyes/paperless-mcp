@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -12,6 +13,9 @@ import (
 	"strings"
 	"time"
 )
+
+// apiVersion is the Paperless-ngx REST API version we target.
+const apiVersion = 5
 
 // Client wraps the Paperless-ngx REST API.
 type Client struct {
@@ -31,11 +35,74 @@ func NewClient(baseURL, token string) *Client {
 	}
 }
 
+// CheckAPIVersion probes /api/ and warns if the Paperless-ngx instance
+// exposes a newer API version than the one we target. This is advisory only —
+// the server continues regardless.
+func (c *Client) CheckAPIVersion() {
+	req, err := http.NewRequest(http.MethodGet, c.baseURL+"/api/", nil)
+	if err != nil {
+		log.Printf("warning: could not build API version check request: %v", err)
+		return
+	}
+	req.Header.Set("Authorization", "Token "+c.token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		log.Printf("warning: API version check failed (could not reach Paperless): %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("warning: API version check returned HTTP %d", resp.StatusCode)
+		return
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("warning: API version check: could not read response: %v", err)
+		return
+	}
+
+	// The /api/ root returns an object whose keys are endpoint names; the
+	// response itself doesn't carry a top-level version field. However,
+	// Paperless-ngx sets X-Version or we can check the header. The most
+	// reliable signal is the X-Api-Version response header (integer).
+	// Some builds also expose it in X-Version.
+	if hdr := resp.Header.Get("X-Api-Version"); hdr != "" {
+		if ver, err := strconv.Atoi(hdr); err == nil {
+			if ver > apiVersion {
+				log.Printf("WARNING: Paperless-ngx reports API version %d, but paperless-mcp targets version %d. "+
+					"Newer API versions may have changed behaviour; please verify compatibility.", ver, apiVersion)
+			} else {
+				log.Printf("paperless-ngx API version: %d (target: %d) — OK", ver, apiVersion)
+			}
+			return
+		}
+	}
+
+	// Fallback: look for a version key in the JSON body (some builds include it).
+	var root map[string]json.RawMessage
+	if err := json.Unmarshal(body, &root); err == nil {
+		if verRaw, ok := root["version"]; ok {
+			var ver int
+			if json.Unmarshal(verRaw, &ver) == nil && ver > apiVersion {
+				log.Printf("WARNING: Paperless-ngx reports API version %d, but paperless-mcp targets version %d. "+
+					"Newer API versions may have changed behaviour; please verify compatibility.", ver, apiVersion)
+				return
+			}
+		}
+	}
+
+	log.Printf("paperless-ngx API version check: could not determine remote version (targeting %d)", apiVersion)
+}
+
 // doRequest executes a request with the Paperless auth header and returns the body.
 func (c *Client) doRequest(req *http.Request) ([]byte, error) {
 	req.Header.Set("Authorization", "Token "+c.token)
 	if req.Header.Get("Accept") == "" {
-		req.Header.Set("Accept", "application/json; version=5")
+		req.Header.Set("Accept", fmt.Sprintf("application/json; version=%d", apiVersion))
 	}
 
 	client := c.http

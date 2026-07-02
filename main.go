@@ -21,6 +21,7 @@ func main() {
 	}
 
 	client := NewClient(cfg.PaperlessURL, cfg.PaperlessToken)
+	client.CheckAPIVersion()
 	mcpServer := NewMCPServer(client)
 	httpHandler := NewHTTPServer(mcpServer, cfg.MCPToken, cfg.PaperlessURL)
 
