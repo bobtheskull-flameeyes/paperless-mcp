@@ -1,0 +1,5 @@
+paperless-mcp
+config.json
+*.exe
+*.test
+*.out
