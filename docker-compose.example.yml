@@ -1,0 +1,63 @@
+# Example docker-compose file running paperless-mcp alongside Paperless-ngx.
+#
+# Copy this to docker-compose.yml and fill in the environment variables.
+# The MCP server connects to the Paperless-ngx webserver via Docker networking.
+#
+# Usage:
+#   cp docker-compose.example.yml docker-compose.yml
+#   # Edit environment variables below
+#   docker compose up -d
+
+services:
+  broker:
+    image: docker.io/library/redis:8
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+
+  db:
+    image: docker.io/library/postgres:18
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: paperless
+
+  webserver:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    restart: unless-stopped
+    depends_on:
+      - db
+      - broker
+    ports:
+      - "8000:8000"
+    volumes:
+      - data:/usr/src/paperless/data
+      - media:/usr/src/paperless/media
+      - ./export:/usr/src/paperless/export
+      - ./consume:/usr/src/paperless/consume
+    environment:
+      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_DBHOST: db
+      PAPERLESS_DBENGINE: postgresql
+
+  mcp:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - webserver
+    ports:
+      - "8035:8035"
+    environment:
+      PAPERLESS_URL: "http://webserver:8000"
+      PAPERLESS_TOKEN: "your-paperless-api-token"
+      LISTEN_ADDR: ":8035"
+      MCP_TOKEN: "your-mcp-bearer-token"
+
+volumes:
+  data:
+  media:
+  pgdata:
+  redisdata:

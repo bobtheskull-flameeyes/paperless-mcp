@@ -1,3 +1,3 @@
-module paperless-mcp
+module github.com/bobtheskull-flameeyes/paperless-mcp
 
-go 1.21
+go 1.22

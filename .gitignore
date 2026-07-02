@@ -1,5 +1,6 @@
 paperless-mcp
 config.json
+*.env
 *.exe
 *.test
 *.out

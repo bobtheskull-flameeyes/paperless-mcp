@@ -8,11 +8,11 @@ Written in Go with no external dependencies.
 
 ## Quick Start
 
+### Binary
+
 ```bash
-# Build
 go build -o paperless-mcp .
 
-# Create config
 cat > config.json <<'EOF'
 {
   "paperless_url": "http://paperless.example.com:8000",
@@ -22,31 +22,61 @@ cat > config.json <<'EOF'
 }
 EOF
 
-# Run
 ./paperless-mcp
 ```
+
+### Docker
+
+```bash
+# Build
+docker build -t paperless-mcp .
+
+# Run
+docker run -d --name paperless-mcp \
+  -p 8035:8035 \
+  -e PAPERLESS_URL=http://paperless.example.com:8000 \
+  -e PAPERLESS_TOKEN=your-paperless-api-token \
+  -e MCP_TOKEN=your-mcp-bearer-token \
+  paperless-mcp
+```
+
+Environment variables are the preferred configuration method for Docker
+deployments. You can also mount a config file:
+
+```bash
+docker run -d --name paperless-mcp \
+  -p 8035:8035 \
+  -v /path/to/config.json:/etc/paperless-mcp/config.json \
+  paperless-mcp -config /etc/paperless-mcp/config.json
+```
+
+### Docker Compose (with Paperless-ngx)
+
+An example compose file is included that runs the MCP server alongside a
+full Paperless-ngx stack (Postgres, Redis, webserver):
+
+```bash
+cp docker-compose.example.yml docker-compose.yml
+# Edit environment variables in docker-compose.yml
+docker compose up -d
+```
+
+The MCP server connects to Paperless-ngx via Docker networking
+(`http://webserver:8000`), so no port exposure is needed for the Paperless
+API — only the MCP endpoint is published.
 
 ## Configuration
 
 Configuration is read from a JSON file (default `config.json`, override with
-`-config path/to/file.json`).
+`-config path/to/file.json`). Environment variables take precedence over the
+config file.
 
-| Field              | Description                                  | Default  |
-|--------------------|----------------------------------------------|----------|
-| `paperless_url`    | Paperless-ngx base URL                       | required |
-| `paperless_token`  | Paperless-ngx API token                      | required |
-| `listen_addr`      | Address to listen on                         | `:8035`  |
-| `mcp_token`        | Bearer token for MCP endpoint authentication | (none)   |
-
-### Environment Variable Overrides
-
-Each config field has a corresponding environment variable that takes
-precedence over the config file:
-
-- `PAPERLESS_URL`
-- `PAPERLESS_TOKEN`
-- `LISTEN_ADDR`
-- `MCP_TOKEN`
+| Field / Env Var      | Description                                  | Default  |
+|----------------------|----------------------------------------------|----------|
+| `paperless_url` / `PAPERLESS_URL`     | Paperless-ngx base URL        | required |
+| `paperless_token` / `PAPERLESS_TOKEN` | Paperless-ngx API token       | required |
+| `listen_addr` / `LISTEN_ADDR`         | Address to listen on          | `:8035`  |
+| `mcp_token` / `MCP_TOKEN`             | Bearer token for MCP endpoint | (none)   |
 
 ### Getting a Paperless-ngx API Token
 
@@ -121,6 +151,12 @@ No authentication required.
 ```
 -config string    path to config file (default "config.json")
 -addr string      listen address (overrides config)
+```
+
+## Install from Source
+
+```bash
+go install github.com/bobtheskull-flameeyes/paperless-mcp@latest
 ```
 
 ## License
