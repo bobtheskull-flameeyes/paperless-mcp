@@ -57,5 +57,11 @@ func LoadConfig(path string) (*Config, error) {
 	// Normalise URL: strip trailing slashes.
 	cfg.PaperlessURL = strings.TrimRight(cfg.PaperlessURL, "/")
 
+	// Special mcp_token value: "paperless" means reuse the Paperless API token
+	// for MCP endpoint authentication, so you can manage it from the Paperless UI.
+	if strings.EqualFold(cfg.MCPToken, "paperless") {
+		cfg.MCPToken = cfg.PaperlessToken
+	}
+
 	return cfg, nil
 }

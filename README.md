@@ -78,6 +78,11 @@ config file.
 | `listen_addr` / `LISTEN_ADDR`         | Address to listen on          | `:8035`  |
 | `mcp_token` / `MCP_TOKEN`             | Bearer token for MCP endpoint | (none)   |
 
+Set `mcp_token` to the special value `"paperless"` to reuse the Paperless-ngx
+API token for MCP authentication. This lets you manage a single token through
+the Paperless UI (My Profile → Auth Token) instead of maintaining a separate
+secret on the MCP server.
+
 ### Getting a Paperless-ngx API Token
 
 1. Log into your Paperless-ngx instance

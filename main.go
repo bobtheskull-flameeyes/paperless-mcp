@@ -27,10 +27,13 @@ func main() {
 
 	log.Printf("paperless-mcp %s listening on %s", serverVersion, cfg.ListenAddr)
 	log.Printf("paperless-ngx: %s", cfg.PaperlessURL)
-	if cfg.MCPToken != "" {
-		log.Printf("bearer auth: enabled")
-	} else {
+	switch {
+	case cfg.MCPToken == "":
 		log.Printf("bearer auth: disabled (no mcp_token configured)")
+	case cfg.MCPToken == cfg.PaperlessToken:
+		log.Printf("bearer auth: enabled (using paperless token)")
+	default:
+		log.Printf("bearer auth: enabled")
 	}
 
 	log.Fatal(http.ListenAndServe(cfg.ListenAddr, httpHandler))
