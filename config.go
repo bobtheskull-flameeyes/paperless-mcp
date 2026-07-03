@@ -13,8 +13,8 @@ const (
 	MCPAuthNone = "none"
 	// MCPAuthToken requires a dedicated bearer token (mcp_token).
 	MCPAuthToken = "token"
-	// MCPAuthPassthrough accepts the Paperless API token as the MCP bearer
-	// token, so you can manage one token through the Paperless UI.
+	// MCPAuthPassthrough forwards the caller's bearer token to Paperless-ngx,
+	// so callers authenticate with their own Paperless API token.
 	MCPAuthPassthrough = "passthrough"
 )
 
@@ -25,19 +25,6 @@ type Config struct {
 	ListenAddr     string `json:"listen_addr"`
 	MCPAuth        string `json:"mcp_auth"`
 	MCPToken       string `json:"mcp_token"`
-}
-
-// EffectiveMCPToken returns the bearer token the MCP endpoint should check,
-// or "" if authentication is disabled.
-func (c *Config) EffectiveMCPToken() string {
-	switch c.MCPAuth {
-	case MCPAuthToken:
-		return c.MCPToken
-	case MCPAuthPassthrough:
-		return c.PaperlessToken
-	default:
-		return ""
-	}
 }
 
 // LoadConfig reads configuration from a JSON file, then applies environment
@@ -78,12 +65,6 @@ func LoadConfig(path string) (*Config, error) {
 	if cfg.PaperlessURL == "" {
 		return nil, fmt.Errorf("paperless_url is required (set in config or PAPERLESS_URL)")
 	}
-	if cfg.PaperlessToken == "" {
-		return nil, fmt.Errorf("paperless_token is required (set in config or PAPERLESS_TOKEN)")
-	}
-
-	// Normalise URL: strip trailing slashes.
-	cfg.PaperlessURL = strings.TrimRight(cfg.PaperlessURL, "/")
 
 	// Default mcp_auth from legacy mcp_token presence for backward compatibility.
 	if cfg.MCPAuth == "" {
@@ -94,20 +75,29 @@ func LoadConfig(path string) (*Config, error) {
 		}
 	}
 
-	// Validate mcp_auth.
+	// Validate mcp_auth and dependent fields.
 	switch cfg.MCPAuth {
 	case MCPAuthNone:
-		// OK.
+		if cfg.PaperlessToken == "" {
+			return nil, fmt.Errorf("paperless_token is required (set in config or PAPERLESS_TOKEN)")
+		}
 	case MCPAuthToken:
+		if cfg.PaperlessToken == "" {
+			return nil, fmt.Errorf("paperless_token is required (set in config or PAPERLESS_TOKEN)")
+		}
 		if cfg.MCPToken == "" {
 			return nil, fmt.Errorf("mcp_auth is %q but mcp_token is not set", MCPAuthToken)
 		}
 	case MCPAuthPassthrough:
-		// OK — uses PaperlessToken, which is already validated above.
+		// paperless_token is optional: if set, used for startup checks;
+		// if not, callers provide their own token per request.
 	default:
 		return nil, fmt.Errorf("mcp_auth must be %q, %q, or %q (got %q)",
 			MCPAuthNone, MCPAuthToken, MCPAuthPassthrough, cfg.MCPAuth)
 	}
+
+	// Normalise URL: strip trailing slashes.
+	cfg.PaperlessURL = strings.TrimRight(cfg.PaperlessURL, "/")
 
 	return cfg, nil
 }

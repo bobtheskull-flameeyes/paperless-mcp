@@ -20,10 +20,25 @@ func main() {
 		cfg.ListenAddr = *addr
 	}
 
-	client := NewClient(cfg.PaperlessURL, cfg.PaperlessToken)
-	client.CheckAPIVersion()
-	mcpServer := NewMCPServer(client)
-	httpHandler := NewHTTPServer(mcpServer, cfg.EffectiveMCPToken(), cfg.PaperlessURL)
+	// Create the base Paperless client. In passthrough mode without a
+	// configured token, the base client has an empty token and is only
+	// used as a template for per-request WithToken copies.
+	baseClient := NewClient(cfg.PaperlessURL, cfg.PaperlessToken)
+
+	// Check API version if we have a token to authenticate with.
+	if cfg.PaperlessToken != "" {
+		baseClient.CheckAPIVersion()
+	}
+
+	// Create the shared MCPServer for none/token modes. In passthrough mode
+	// a per-request server is created instead, but we still need a base
+	// client for WithToken.
+	var baseMCP *MCPServer
+	if cfg.MCPAuth != MCPAuthPassthrough {
+		baseMCP = NewMCPServer(baseClient)
+	}
+
+	httpHandler := NewHTTPServer(baseMCP, baseClient, cfg)
 
 	log.Printf("paperless-mcp %s listening on %s", serverVersion, cfg.ListenAddr)
 	log.Printf("paperless-ngx: %s", cfg.PaperlessURL)
@@ -33,7 +48,11 @@ func main() {
 	case MCPAuthToken:
 		log.Printf("mcp auth: token")
 	case MCPAuthPassthrough:
-		log.Printf("mcp auth: passthrough (using paperless token)")
+		if cfg.PaperlessToken != "" {
+			log.Printf("mcp auth: passthrough (server-side token available for health checks)")
+		} else {
+			log.Printf("mcp auth: passthrough (no server-side token)")
+		}
 	}
 
 	log.Fatal(http.ListenAndServe(cfg.ListenAddr, httpHandler))

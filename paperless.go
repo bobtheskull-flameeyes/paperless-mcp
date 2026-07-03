@@ -35,6 +35,17 @@ func NewClient(baseURL, token string) *Client {
 	}
 }
 
+// WithToken returns a shallow copy of the client using a different API token.
+// The underlying HTTP clients are shared.
+func (c *Client) WithToken(token string) *Client {
+	return &Client{
+		baseURL: c.baseURL,
+		token:   token,
+		http:    c.http,
+		upload:  c.upload,
+	}
+}
+
 // CheckAPIVersion probes /api/ and warns if the Paperless-ngx instance
 // exposes a newer API version than the one we target. This is advisory only —
 // the server continues regardless.

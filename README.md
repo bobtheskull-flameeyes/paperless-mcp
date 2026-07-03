@@ -74,7 +74,7 @@ config file.
 | Field / Env Var      | Description                                  | Default  |
 |----------------------|----------------------------------------------|----------|
 | `paperless_url` / `PAPERLESS_URL`     | Paperless-ngx base URL        | required |
-| `paperless_token` / `PAPERLESS_TOKEN` | Paperless-ngx API token       | required |
+| `paperless_token` / `PAPERLESS_TOKEN` | Paperless-ngx API token       | required (except `passthrough`) |
 | `listen_addr` / `LISTEN_ADDR`         | Address to listen on          | `:8035`  |
 | `mcp_token` / `MCP_TOKEN`             | Bearer token for MCP endpoint (when `mcp_auth` is `token`) | (none)   |
 | `mcp_auth` / `MCP_AUTH`               | MCP auth mode: `none`, `token`, or `passthrough`            | (auto)   |
@@ -83,9 +83,9 @@ config file.
 
 | Mode          | Description |
 |---------------|-------------|
-| `none`        | No authentication on the MCP endpoint. Suitable for local/trusted networks. |
-| `token`       | Require a dedicated bearer token set via `mcp_token`. |
-| `passthrough` | Accept the Paperless-ngx API token as the MCP bearer token. Lets you manage one token through the Paperless UI (My Profile → Auth Token) instead of maintaining a separate secret. |
+| `none`        | No authentication on the MCP endpoint. Suitable for local/trusted networks. `paperless_token` is required. |
+| `token`       | Require a dedicated bearer token set via `mcp_token`. `paperless_token` is required. |
+| `passthrough` | Forward the caller's bearer token to Paperless-ngx. Each caller authenticates with their own Paperless API token — the server doesn't need `paperless_token` (though if provided, it's used for the startup API version check). |
 
 If `mcp_auth` is not set, it defaults to `token` when `mcp_token` is present,
 or `none` otherwise — so existing configs that only set `mcp_token` continue
@@ -103,10 +103,14 @@ The MCP endpoint (`POST /mcp`) authentication is controlled by `mcp_auth`:
 
 - **`none`** — no authentication required (suitable for local development only).
 - **`token`** — clients must send `Authorization: Bearer <mcp_token>`.
-- **`passthrough`** — clients must send `Authorization: Bearer <paperless_token>`.
+- **`passthrough`** — clients must send `Authorization: Bearer <their-paperless-api-token>`.
+  The server forwards this token to Paperless-ngx for every API call. No
+  server-side `paperless_token` is needed — each caller brings their own
+  credential, and Paperless-ngx decides what they can access.
 
 The server authenticates to Paperless-ngx using
-`Authorization: Token <paperless_token>` on all API requests.
+`Authorization: Token <paperless_token>` on all API requests (in `none` and
+`token` modes), or the caller's forwarded token (in `passthrough` mode).
 
 ## API Compatibility
 
