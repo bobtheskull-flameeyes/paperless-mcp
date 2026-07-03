@@ -23,17 +23,17 @@ func main() {
 	client := NewClient(cfg.PaperlessURL, cfg.PaperlessToken)
 	client.CheckAPIVersion()
 	mcpServer := NewMCPServer(client)
-	httpHandler := NewHTTPServer(mcpServer, cfg.MCPToken, cfg.PaperlessURL)
+	httpHandler := NewHTTPServer(mcpServer, cfg.EffectiveMCPToken(), cfg.PaperlessURL)
 
 	log.Printf("paperless-mcp %s listening on %s", serverVersion, cfg.ListenAddr)
 	log.Printf("paperless-ngx: %s", cfg.PaperlessURL)
-	switch {
-	case cfg.MCPToken == "":
-		log.Printf("bearer auth: disabled (no mcp_token configured)")
-	case cfg.MCPToken == cfg.PaperlessToken:
-		log.Printf("bearer auth: enabled (using paperless token)")
-	default:
-		log.Printf("bearer auth: enabled")
+	switch cfg.MCPAuth {
+	case MCPAuthNone:
+		log.Printf("mcp auth: none")
+	case MCPAuthToken:
+		log.Printf("mcp auth: token")
+	case MCPAuthPassthrough:
+		log.Printf("mcp auth: passthrough (using paperless token)")
 	}
 
 	log.Fatal(http.ListenAndServe(cfg.ListenAddr, httpHandler))

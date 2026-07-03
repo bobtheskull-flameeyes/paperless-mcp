@@ -76,12 +76,20 @@ config file.
 | `paperless_url` / `PAPERLESS_URL`     | Paperless-ngx base URL        | required |
 | `paperless_token` / `PAPERLESS_TOKEN` | Paperless-ngx API token       | required |
 | `listen_addr` / `LISTEN_ADDR`         | Address to listen on          | `:8035`  |
-| `mcp_token` / `MCP_TOKEN`             | Bearer token for MCP endpoint | (none)   |
+| `mcp_token` / `MCP_TOKEN`             | Bearer token for MCP endpoint (when `mcp_auth` is `token`) | (none)   |
+| `mcp_auth` / `MCP_AUTH`               | MCP auth mode: `none`, `token`, or `passthrough`            | (auto)   |
 
-Set `mcp_token` to the special value `"paperless"` to reuse the Paperless-ngx
-API token for MCP authentication. This lets you manage a single token through
-the Paperless UI (My Profile → Auth Token) instead of maintaining a separate
-secret on the MCP server.
+### MCP Authentication Modes
+
+| Mode          | Description |
+|---------------|-------------|
+| `none`        | No authentication on the MCP endpoint. Suitable for local/trusted networks. |
+| `token`       | Require a dedicated bearer token set via `mcp_token`. |
+| `passthrough` | Accept the Paperless-ngx API token as the MCP bearer token. Lets you manage one token through the Paperless UI (My Profile → Auth Token) instead of maintaining a separate secret. |
+
+If `mcp_auth` is not set, it defaults to `token` when `mcp_token` is present,
+or `none` otherwise — so existing configs that only set `mcp_token` continue
+to work unchanged.
 
 ### Getting a Paperless-ngx API Token
 
@@ -91,15 +99,11 @@ secret on the MCP server.
 
 ## Authentication
 
-The MCP endpoint (`POST /mcp`) is protected by bearer token authentication
-when `mcp_token` is configured. Clients must send:
+The MCP endpoint (`POST /mcp`) authentication is controlled by `mcp_auth`:
 
-```
-Authorization: Bearer <mcp_token>
-```
-
-If `mcp_token` is empty, authentication is disabled (suitable for local
-development only).
+- **`none`** — no authentication required (suitable for local development only).
+- **`token`** — clients must send `Authorization: Bearer <mcp_token>`.
+- **`passthrough`** — clients must send `Authorization: Bearer <paperless_token>`.
 
 The server authenticates to Paperless-ngx using
 `Authorization: Token <paperless_token>` on all API requests.
