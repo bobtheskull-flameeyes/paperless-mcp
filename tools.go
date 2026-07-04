@@ -708,7 +708,7 @@ func (r *ToolRegistry) defineTools() []Tool {
 				"is_root":         {Type: "boolean", Desc: "Filter: true for root tags (no parent), false for child tags."},
 				"ordering":        {Type: "string", Desc: "Sort field, e.g. 'name', '-name', 'document_count', '-document_count'."},
 				"page":            {Type: "integer", Desc: "Page number (default 1)."},
-				"page_size":       {Type: "integer", Desc: "Results per page (default 1000)."},
+				"page_size":       {Type: "integer", Desc: "Results per page (default 20)."},
 			}, nil),
 		},
 		{
@@ -732,7 +732,7 @@ func (r *ToolRegistry) defineTools() []Tool {
 				"name__iendswith":  {Type: "string", Desc: "Filter: name ends with (case-insensitive)."},
 				"ordering":        {Type: "string", Desc: "Sort field, e.g. 'name', '-name', 'document_count', '-document_count', 'last_correspondence'."},
 				"page":            {Type: "integer", Desc: "Page number (default 1)."},
-				"page_size":       {Type: "integer", Desc: "Results per page (default 1000)."},
+				"page_size":       {Type: "integer", Desc: "Results per page (default 20)."},
 			}, nil),
 		},
 		{
@@ -755,7 +755,7 @@ func (r *ToolRegistry) defineTools() []Tool {
 				"name__iendswith":  {Type: "string", Desc: "Filter: name ends with (case-insensitive)."},
 				"ordering":        {Type: "string", Desc: "Sort field, e.g. 'name', '-name', 'document_count', '-document_count'."},
 				"page":            {Type: "integer", Desc: "Page number (default 1)."},
-				"page_size":       {Type: "integer", Desc: "Results per page (default 1000)."},
+				"page_size":       {Type: "integer", Desc: "Results per page (default 20)."},
 			}, nil),
 		},
 		{
@@ -782,7 +782,7 @@ func (r *ToolRegistry) defineTools() []Tool {
 				"path__iendswith":  {Type: "string", Desc: "Filter: path template ends with (case-insensitive)."},
 				"ordering":        {Type: "string", Desc: "Sort field, e.g. 'name', '-name', 'path', '-path', 'document_count'."},
 				"page":            {Type: "integer", Desc: "Page number (default 1)."},
-				"page_size":       {Type: "integer", Desc: "Results per page (default 1000)."},
+				"page_size":       {Type: "integer", Desc: "Results per page (default 20)."},
 			}, nil),
 		},
 		{
@@ -795,7 +795,7 @@ func (r *ToolRegistry) defineTools() []Tool {
 				"name__iendswith":  {Type: "string", Desc: "Filter: name ends with (case-insensitive)."},
 				"ordering":        {Type: "string", Desc: "Sort field."},
 				"page":            {Type: "integer", Desc: "Page number (default 1)."},
-				"page_size":       {Type: "integer", Desc: "Results per page (default 1000)."},
+				"page_size":       {Type: "integer", Desc: "Results per page (default 20)."},
 			}, nil),
 		},
 		{
@@ -804,7 +804,7 @@ func (r *ToolRegistry) defineTools() []Tool {
 			InputSchema: jsonSchema(map[string]propDef{
 				"ordering":  {Type: "string", Desc: "Sort field."},
 				"page":      {Type: "integer", Desc: "Page number (default 1)."},
-				"page_size": {Type: "integer", Desc: "Results per page (default 1000)."},
+				"page_size": {Type: "integer", Desc: "Results per page (default 20)."},
 			}, nil),
 		},
 	}

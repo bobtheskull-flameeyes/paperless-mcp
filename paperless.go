@@ -429,7 +429,7 @@ func withDefaultPageSize(params url.Values) url.Values {
 		params = url.Values{}
 	}
 	if params.Get("page_size") == "" {
-		params.Set("page_size", "1000")
+		params.Set("page_size", "20")
 	}
 	return params
 }
