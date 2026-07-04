@@ -370,8 +370,9 @@ func (c *Client) GetDocumentMetadata(id int) (json.RawMessage, error) {
 
 // --- Tags ---
 
-func (c *Client) ListTags() (json.RawMessage, error) {
-	return c.doGet("/api/tags/", url.Values{"page_size": {"1000"}})
+func (c *Client) ListTags(params url.Values) (json.RawMessage, error) {
+	params = withDefaultPageSize(params)
+	return c.doGet("/api/tags/", params)
 }
 
 func (c *Client) CreateTag(fields map[string]interface{}) (json.RawMessage, error) {
@@ -380,8 +381,9 @@ func (c *Client) CreateTag(fields map[string]interface{}) (json.RawMessage, erro
 
 // --- Correspondents ---
 
-func (c *Client) ListCorrespondents() (json.RawMessage, error) {
-	return c.doGet("/api/correspondents/", url.Values{"page_size": {"1000"}})
+func (c *Client) ListCorrespondents(params url.Values) (json.RawMessage, error) {
+	params = withDefaultPageSize(params)
+	return c.doGet("/api/correspondents/", params)
 }
 
 func (c *Client) CreateCorrespondent(fields map[string]interface{}) (json.RawMessage, error) {
@@ -390,8 +392,9 @@ func (c *Client) CreateCorrespondent(fields map[string]interface{}) (json.RawMes
 
 // --- Document types ---
 
-func (c *Client) ListDocumentTypes() (json.RawMessage, error) {
-	return c.doGet("/api/document_types/", url.Values{"page_size": {"1000"}})
+func (c *Client) ListDocumentTypes(params url.Values) (json.RawMessage, error) {
+	params = withDefaultPageSize(params)
+	return c.doGet("/api/document_types/", params)
 }
 
 func (c *Client) CreateDocumentType(fields map[string]interface{}) (json.RawMessage, error) {
@@ -400,20 +403,35 @@ func (c *Client) CreateDocumentType(fields map[string]interface{}) (json.RawMess
 
 // --- Storage paths ---
 
-func (c *Client) ListStoragePaths() (json.RawMessage, error) {
-	return c.doGet("/api/storage_paths/", url.Values{"page_size": {"1000"}})
+func (c *Client) ListStoragePaths(params url.Values) (json.RawMessage, error) {
+	params = withDefaultPageSize(params)
+	return c.doGet("/api/storage_paths/", params)
 }
 
 // --- Custom fields ---
 
-func (c *Client) ListCustomFields() (json.RawMessage, error) {
-	return c.doGet("/api/custom_fields/", url.Values{"page_size": {"1000"}})
+func (c *Client) ListCustomFields(params url.Values) (json.RawMessage, error) {
+	params = withDefaultPageSize(params)
+	return c.doGet("/api/custom_fields/", params)
 }
 
 // --- Saved views ---
 
-func (c *Client) ListSavedViews() (json.RawMessage, error) {
-	return c.doGet("/api/saved_views/", url.Values{"page_size": {"1000"}})
+func (c *Client) ListSavedViews(params url.Values) (json.RawMessage, error) {
+	params = withDefaultPageSize(params)
+	return c.doGet("/api/saved_views/", params)
+}
+
+// withDefaultPageSize returns a copy of params with page_size defaulting to
+// 1000 when not explicitly set. A nil input is treated as empty.
+func withDefaultPageSize(params url.Values) url.Values {
+	if params == nil {
+		params = url.Values{}
+	}
+	if params.Get("page_size") == "" {
+		params.Set("page_size", "1000")
+	}
+	return params
 }
 
 // truncate shortens a string for display in error messages.

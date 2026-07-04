@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strconv"
 )
 
@@ -147,6 +148,30 @@ func getIntArrayArg(args map[string]interface{}, key string) ([]int, bool) {
 		}
 	}
 	return result, true
+}
+
+// extractNameFilters pulls common name/id filter params, pagination, and
+// ordering from tool call args into url.Values. Used by list_tags,
+// list_correspondents, list_document_types, list_storage_paths, and
+// list_custom_fields.
+func extractNameFilters(args map[string]interface{}) url.Values {
+	params := url.Values{}
+	stringKeys := []string{
+		"name__icontains", "name__istartswith", "name__iexact", "name__iendswith",
+		"ordering",
+	}
+	for _, key := range stringKeys {
+		if v, ok := getStringArg(args, key); ok {
+			params.Set(key, v)
+		}
+	}
+	intKeys := []string{"page", "page_size"}
+	for _, key := range intKeys {
+		if v, ok := getIntArg(args, key); ok {
+			params.Set(key, strconv.Itoa(v))
+		}
+	}
+	return params
 }
 
 // --- Tool handlers ---
@@ -405,8 +430,16 @@ func (r *ToolRegistry) getDocumentMetadata(args map[string]interface{}) *ToolCal
 	return JSONResult(data)
 }
 
-func (r *ToolRegistry) listTags(_ map[string]interface{}) *ToolCallResult {
-	data, err := r.client.ListTags()
+func (r *ToolRegistry) listTags(args map[string]interface{}) *ToolCallResult {
+	params := extractNameFilters(args)
+	if v, ok := getBoolArg(args, "is_root"); ok {
+		if v {
+			params.Set("is_root", "true")
+		} else {
+			params.Set("is_root", "false")
+		}
+	}
+	data, err := r.client.ListTags(params)
 	if err != nil {
 		return ErrorResult("list tags failed: %v", err)
 	}
@@ -440,8 +473,9 @@ func (r *ToolRegistry) createTag(args map[string]interface{}) *ToolCallResult {
 	return JSONResult(data)
 }
 
-func (r *ToolRegistry) listCorrespondents(_ map[string]interface{}) *ToolCallResult {
-	data, err := r.client.ListCorrespondents()
+func (r *ToolRegistry) listCorrespondents(args map[string]interface{}) *ToolCallResult {
+	params := extractNameFilters(args)
+	data, err := r.client.ListCorrespondents(params)
 	if err != nil {
 		return ErrorResult("list correspondents failed: %v", err)
 	}
@@ -472,8 +506,9 @@ func (r *ToolRegistry) createCorrespondent(args map[string]interface{}) *ToolCal
 	return JSONResult(data)
 }
 
-func (r *ToolRegistry) listDocumentTypes(_ map[string]interface{}) *ToolCallResult {
-	data, err := r.client.ListDocumentTypes()
+func (r *ToolRegistry) listDocumentTypes(args map[string]interface{}) *ToolCallResult {
+	params := extractNameFilters(args)
+	data, err := r.client.ListDocumentTypes(params)
 	if err != nil {
 		return ErrorResult("list document types failed: %v", err)
 	}
@@ -504,24 +539,42 @@ func (r *ToolRegistry) createDocumentType(args map[string]interface{}) *ToolCall
 	return JSONResult(data)
 }
 
-func (r *ToolRegistry) listStoragePaths(_ map[string]interface{}) *ToolCallResult {
-	data, err := r.client.ListStoragePaths()
+func (r *ToolRegistry) listStoragePaths(args map[string]interface{}) *ToolCallResult {
+	params := extractNameFilters(args)
+	// Storage paths also support filtering on the path field itself.
+	for _, key := range []string{"path__icontains", "path__istartswith", "path__iexact", "path__iendswith"} {
+		if v, ok := getStringArg(args, key); ok {
+			params.Set(key, v)
+		}
+	}
+	data, err := r.client.ListStoragePaths(params)
 	if err != nil {
 		return ErrorResult("list storage paths failed: %v", err)
 	}
 	return JSONResult(data)
 }
 
-func (r *ToolRegistry) listCustomFields(_ map[string]interface{}) *ToolCallResult {
-	data, err := r.client.ListCustomFields()
+func (r *ToolRegistry) listCustomFields(args map[string]interface{}) *ToolCallResult {
+	params := extractNameFilters(args)
+	data, err := r.client.ListCustomFields(params)
 	if err != nil {
 		return ErrorResult("list custom fields failed: %v", err)
 	}
 	return JSONResult(data)
 }
 
-func (r *ToolRegistry) listSavedViews(_ map[string]interface{}) *ToolCallResult {
-	data, err := r.client.ListSavedViews()
+func (r *ToolRegistry) listSavedViews(args map[string]interface{}) *ToolCallResult {
+	params := url.Values{}
+	if v, ok := getIntArg(args, "page"); ok {
+		params.Set("page", strconv.Itoa(v))
+	}
+	if v, ok := getIntArg(args, "page_size"); ok {
+		params.Set("page_size", strconv.Itoa(v))
+	}
+	if v, ok := getStringArg(args, "ordering"); ok {
+		params.Set("ordering", v)
+	}
+	data, err := r.client.ListSavedViews(params)
 	if err != nil {
 		return ErrorResult("list saved views failed: %v", err)
 	}
@@ -646,8 +699,17 @@ func (r *ToolRegistry) defineTools() []Tool {
 		},
 		{
 			Name:        "list_tags",
-			Description: "List all tags.",
-			InputSchema: jsonSchema(nil, nil),
+			Description: "List tags with optional filtering. Returns all tags when called without filters.",
+			InputSchema: jsonSchema(map[string]propDef{
+				"name__icontains":  {Type: "string", Desc: "Filter: name contains (case-insensitive)."},
+				"name__istartswith": {Type: "string", Desc: "Filter: name starts with (case-insensitive)."},
+				"name__iexact":     {Type: "string", Desc: "Filter: name matches exactly (case-insensitive)."},
+				"name__iendswith":  {Type: "string", Desc: "Filter: name ends with (case-insensitive)."},
+				"is_root":         {Type: "boolean", Desc: "Filter: true for root tags (no parent), false for child tags."},
+				"ordering":        {Type: "string", Desc: "Sort field, e.g. 'name', '-name', 'document_count', '-document_count'."},
+				"page":            {Type: "integer", Desc: "Page number (default 1)."},
+				"page_size":       {Type: "integer", Desc: "Results per page (default 1000)."},
+			}, nil),
 		},
 		{
 			Name:        "create_tag",
@@ -662,8 +724,16 @@ func (r *ToolRegistry) defineTools() []Tool {
 		},
 		{
 			Name:        "list_correspondents",
-			Description: "List all correspondents.",
-			InputSchema: jsonSchema(nil, nil),
+			Description: "List correspondents with optional filtering. Returns all correspondents when called without filters.",
+			InputSchema: jsonSchema(map[string]propDef{
+				"name__icontains":  {Type: "string", Desc: "Filter: name contains (case-insensitive)."},
+				"name__istartswith": {Type: "string", Desc: "Filter: name starts with (case-insensitive)."},
+				"name__iexact":     {Type: "string", Desc: "Filter: name matches exactly (case-insensitive)."},
+				"name__iendswith":  {Type: "string", Desc: "Filter: name ends with (case-insensitive)."},
+				"ordering":        {Type: "string", Desc: "Sort field, e.g. 'name', '-name', 'document_count', '-document_count', 'last_correspondence'."},
+				"page":            {Type: "integer", Desc: "Page number (default 1)."},
+				"page_size":       {Type: "integer", Desc: "Results per page (default 1000)."},
+			}, nil),
 		},
 		{
 			Name:        "create_correspondent",
@@ -677,8 +747,16 @@ func (r *ToolRegistry) defineTools() []Tool {
 		},
 		{
 			Name:        "list_document_types",
-			Description: "List all document types.",
-			InputSchema: jsonSchema(nil, nil),
+			Description: "List document types with optional filtering. Returns all document types when called without filters.",
+			InputSchema: jsonSchema(map[string]propDef{
+				"name__icontains":  {Type: "string", Desc: "Filter: name contains (case-insensitive)."},
+				"name__istartswith": {Type: "string", Desc: "Filter: name starts with (case-insensitive)."},
+				"name__iexact":     {Type: "string", Desc: "Filter: name matches exactly (case-insensitive)."},
+				"name__iendswith":  {Type: "string", Desc: "Filter: name ends with (case-insensitive)."},
+				"ordering":        {Type: "string", Desc: "Sort field, e.g. 'name', '-name', 'document_count', '-document_count'."},
+				"page":            {Type: "integer", Desc: "Page number (default 1)."},
+				"page_size":       {Type: "integer", Desc: "Results per page (default 1000)."},
+			}, nil),
 		},
 		{
 			Name:        "create_document_type",
@@ -692,18 +770,42 @@ func (r *ToolRegistry) defineTools() []Tool {
 		},
 		{
 			Name:        "list_storage_paths",
-			Description: "List all storage paths.",
-			InputSchema: jsonSchema(nil, nil),
+			Description: "List storage paths with optional filtering. Returns all storage paths when called without filters.",
+			InputSchema: jsonSchema(map[string]propDef{
+				"name__icontains":  {Type: "string", Desc: "Filter: name contains (case-insensitive)."},
+				"name__istartswith": {Type: "string", Desc: "Filter: name starts with (case-insensitive)."},
+				"name__iexact":     {Type: "string", Desc: "Filter: name matches exactly (case-insensitive)."},
+				"name__iendswith":  {Type: "string", Desc: "Filter: name ends with (case-insensitive)."},
+				"path__icontains":  {Type: "string", Desc: "Filter: path template contains (case-insensitive)."},
+				"path__istartswith": {Type: "string", Desc: "Filter: path template starts with (case-insensitive)."},
+				"path__iexact":     {Type: "string", Desc: "Filter: path template matches exactly (case-insensitive)."},
+				"path__iendswith":  {Type: "string", Desc: "Filter: path template ends with (case-insensitive)."},
+				"ordering":        {Type: "string", Desc: "Sort field, e.g. 'name', '-name', 'path', '-path', 'document_count'."},
+				"page":            {Type: "integer", Desc: "Page number (default 1)."},
+				"page_size":       {Type: "integer", Desc: "Results per page (default 1000)."},
+			}, nil),
 		},
 		{
 			Name:        "list_custom_fields",
-			Description: "List all custom field definitions.",
-			InputSchema: jsonSchema(nil, nil),
+			Description: "List custom field definitions with optional filtering. Returns all custom fields when called without filters.",
+			InputSchema: jsonSchema(map[string]propDef{
+				"name__icontains":  {Type: "string", Desc: "Filter: name contains (case-insensitive)."},
+				"name__istartswith": {Type: "string", Desc: "Filter: name starts with (case-insensitive)."},
+				"name__iexact":     {Type: "string", Desc: "Filter: name matches exactly (case-insensitive)."},
+				"name__iendswith":  {Type: "string", Desc: "Filter: name ends with (case-insensitive)."},
+				"ordering":        {Type: "string", Desc: "Sort field."},
+				"page":            {Type: "integer", Desc: "Page number (default 1)."},
+				"page_size":       {Type: "integer", Desc: "Results per page (default 1000)."},
+			}, nil),
 		},
 		{
 			Name:        "list_saved_views",
-			Description: "List all saved views.",
-			InputSchema: jsonSchema(nil, nil),
+			Description: "List saved views with optional pagination.",
+			InputSchema: jsonSchema(map[string]propDef{
+				"ordering":  {Type: "string", Desc: "Sort field."},
+				"page":      {Type: "integer", Desc: "Page number (default 1)."},
+				"page_size": {Type: "integer", Desc: "Results per page (default 1000)."},
+			}, nil),
 		},
 	}
 }
