@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 paperless-mcp contributors
+// SPDX-License-Identifier: 0BSD
+
 package main
 
 import (
