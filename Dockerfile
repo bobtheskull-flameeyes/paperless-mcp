@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 paperless-mcp contributors
+# SPDX-License-Identifier: 0BSD
+
 FROM golang:1.22-alpine AS build
 WORKDIR /src
 COPY go.mod ./

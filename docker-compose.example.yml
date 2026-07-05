@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 paperless-mcp contributors
+# SPDX-License-Identifier: 0BSD
+
 # Example docker-compose file running paperless-mcp alongside Paperless-ngx.
 #
 # Copy this to docker-compose.yml and fill in the environment variables.
